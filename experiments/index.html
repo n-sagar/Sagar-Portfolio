@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bee Flyer | Design & Frontend Lab</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div class="game-wrapper">
+    <!-- Header Controls -->
+    <header class="game-header">
+      <a href="https://n-sagar.github.io/Sagar-Portfolio/#" class="back-link">← Back to Lab Hub</a>
+      <div class="score-display">Score: <span id="scoreText">0</span></div>
+    </header>
+
+    <!-- Canvas Game Viewport -->
+    <main class="canvas-container">
+      <canvas id="gameCanvas" width="400" height="600"></canvas>
+      
+      <!-- Tap / Start Overlay -->
+      <div id="startOverlay" class="overlay">
+        <h2>Bee Flyer</h2>
+        <p>Tap the screen or press <strong>Spacebar</strong> to fly!</p>
+        <button id="startBtn" class="btn primary">Start Flight</button>
+      </div>
+
+      <!-- Game Over Modal (Resume Delivery) -->
+      <div id="gameOverModal" class="overlay hidden">
+        <div class="modal-card">
+          <span class="badge-death">Ouch! You took a tumble 🐝</span>
+          <h2>Flight Ended!</h2>
+          <p class="score-summary">Final Score: <span id="finalScore">0</span></p>
+          <p class="resume-pitch">
+            The bee may have crashed, but your next project doesn't have to. Check out my resume to see how we can 
+            build great products together!
+          </p>
+
+          <div class="cta-group">
+            <a href="../../portfolio-v1/resume.html" target="_blank" class="btn primary-btn">
+              📄 Download / View Resume
+            </a>
+            <button id="restartBtn" class="btn secondary-btn">Try Again 🔄</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
