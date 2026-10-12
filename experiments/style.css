@@ -26,6 +26,17 @@ body {
   padding: 1rem;
 }
 
+/* The canvas container starts with a frosted blur */
+.game-container canvas {
+  filter: blur(6px);
+  transition: filter 0.4s ease-in-out; /* Smooth transition when clicking start */
+}
+
+/* Once the game starts, this class removes the blur */
+.game-container.game-active canvas {
+  filter: blur(0px);
+}
+
 .game-wrapper {
   width: 100%;
   max-width: 420px;
@@ -56,15 +67,12 @@ body {
   color: var(--accent-yellow);
 }
 
-/* Canvas Viewport */
+/* Container must be relative so absolute children align to it - This is for the Content on the start screen. */
 .canvas-container {
   position: relative;
-  width: 100%;
-  aspect-ratio: 2 / 3;
-  border-radius: 16px;
-  overflow: hidden;
-  border: 1px solid var(--border-color);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+  width: 400px;
+  height: 600px;
+  margin: 0 auto;
 }
 
 #gameCanvas {
@@ -74,20 +82,46 @@ body {
   background: #182026; /* Dark sky background */
 }
 
-/* Overlays */
-.overlay {
+/* Canvas starts with a subtle frosted blur */
+.canvas-container canvas {
+  filter: blur(6px);
+  transition: filter 0.4s ease-in-out;
+}
+
+/* When the game starts, the blur disappears */
+.canvas-container.game-active canvas {
+  filter: blur(0px);
+}
+
+/* The Start Screen Overlay styling  This allows for the canvas to be blurred until the user hits start */
+.start-overlay {
   position: absolute;
-  inset: 0;
-  background: rgba(15, 17, 21, 0.85);
-  backdrop-filter: blur(8px);
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  align-items: center;
+  justify-content: center; /* Centers vertically */
+  align-items: center;     /* Centers horizontally */
   text-align: center;
-  line-height: 4rem;
-  padding: 2rem;
-  transition: opacity 0.3s ease;
+  background: rgba(15, 23, 42, 0.85); /* Sleek dark frosted glass look */
+  color: #ffffff;
+  z-index: 10;
+  border-radius: 12px;
+  padding: 20px;
+}
+
+/* Space out elements inside the overlay */
+.start-overlay h2 {
+  font-size: 32px;
+  margin-bottom: 10px;
+}
+
+.start-overlay p {
+  font-size: 16px;
+  margin-bottom: 24px;
+  color: #94A3B8;
 }
 
 .hidden {

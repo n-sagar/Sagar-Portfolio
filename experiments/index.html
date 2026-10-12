@@ -14,45 +14,44 @@
 </head>
 <body>
 
-  <div class="game-wrapper">
+<!-- The Game Container-->
+<div class="game-wrapper">
+
     <!-- Header Controls -->
-    <header class="game-header">
+  <header class="game-header">
       <a href="https://n-sagar.github.io/Sagar-Portfolio/#" class="back-link">← Back to Lab Hub</a>
       <div class="score-display">Score: <span id="scoreText">0</span></div>
-    </header>
+  </header>
+<main class="canvas-container">
 
-    <!-- Canvas Game Viewport -->
-    <main class="canvas-container">
-      <canvas id="gameCanvas" width="400" height="600"></canvas>
-      
-      <!-- Tap / Start Overlay -->
-      <div id="startOverlay" class="overlay">
-        <h2>Bee Flyer</h2>
-        <p>Tap the screen or press <strong>Spacebar</strong> to fly!</p>
-        <button id="startBtn" class="btn primary">Start Flight</button>
-      </div>
-
-      <!-- Game Over Modal (Resume Delivery) -->
-      <div id="gameOverModal" class="overlay hidden">
-        <div class="modal-card">
-          <span class="badge-death">Ouch! You took a tumble 🐝</span>
-          <h2>Flight Ended!</h2>
-          <p class="score-summary">Final Score: <span id="finalScore">0</span></p>
-          <p class="resume-pitch">
-            The bee may have crashed, but your next project doesn't have to. Check out my resume to see how we can 
-            build great products together!
-          </p>
-
-          <div class="cta-group">
-            <a href="../../portfolio-v1/resume.html" target="_blank" class="btn primary-btn">
-              📄 Download / View Resume
-            </a>
-            <button id="restartBtn" class="btn secondary-btn">Try Again 🔄</button>
-          </div>
-        </div>
-      </div>
-    </main>
+  <!-- 1. The Start Screen Overlay -->
+  <div id="start-screen" class="start-overlay">
+    <h2>Bee Flyer</h2>
+    <p>Tap the screen or press <strong>Spacebar</strong> to fly!</p>
+    <button id="start-btn" class="btn primary-btn">Start Flight</button>
   </div>
+
+  <!-- 2. The Single Game Canvas -->
+  <canvas id="gameCanvas" width="400" height="600"></canvas>
+
+  <!-- 3. Game Over Modal - This is where the user can download your Resume or Start over. -->
+  <div id="gameOverModal" class="overlay hidden">
+    <div class="modal-card">
+      <span class="badge-death">Ouch! You took a tumble 🐝</span>
+      <h2>Flight Ended!</h2>
+      <p class="score-summary">Final Score: <span id="finalScore">0</span></p>
+      <p class="resume-pitch">
+        The bee may have crashed, but your next project doesn't have to. Check out my resume to see how we can build great products together!
+      </p>
+      <div class="cta-group">
+        <a href="../../portfolio-v1/resume.html" target="_blank" class="btn primary-btn">
+          Download / View Resume
+        </a>
+        <button id="restartBtn" class="btn secondary-btn">Try Again 🐝</button>
+      </div>
+    </div>
+  </div>
+</main>
 
   <script src="game.js"></script>
 </body>
