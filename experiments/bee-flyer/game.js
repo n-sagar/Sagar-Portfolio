@@ -16,16 +16,15 @@ const spawnRate = 90; // Spawns flowers quicker (lower number = closer together)
 const obstacleWidth = 40;
 const obstacleGap = 200; 
 
-// Bee Object Setup
+// Bee Object Setup - This is where we adjust the bees' movements
 const bee = {
   x: 80,
   y: canvas.height / 2,
   radius: 18,
-  gravity: 0.55,
-  lift: -9,
+  gravity: 0.35,  // Reduced from 0.55 so it falls much slower & smoother
+  lift: -7.5,     // Adjusted lift to match the lighter gravity perfectly
   velocity: 0
 };
-
 // ==========================================
 // INPUT LISTENER: Start/Flap on Click or Spacebar
 // ==========================================
