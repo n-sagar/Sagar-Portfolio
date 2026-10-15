@@ -4,55 +4,58 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Bee Flyer | Design & Frontend Lab</title>
-  
+
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-  
+
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
-<!-- The Game Container-->
 <div class="game-wrapper">
 
-    <!-- Header Controls -->
+  <!-- Header Controls -->
   <header class="game-header">
-      <a href="https://n-sagar.github.io/Sagar-Portfolio/#" class="back-link">← Back to Lab Hub</a>
-      <div class="score-display">Score: <span id="scoreText">0</span></div>
+    <a href="https://n-sagar.github.io/Sagar-Portfolio/#" class="back-link">&larr; Back to Lab Hub</a>
+    <div class="score-display">Score: <span id="scoreText">0</span></div>
   </header>
-<main class="canvas-container">
 
-  <!-- 1. The Start Screen Overlay -->
-  <div id="start-screen" class="start-overlay">
-    <h2>Bee Flyer</h2>
-    <p>Tap the screen or press <strong>Spacebar</strong> to fly!</p>
-    <button id="start-btn" class="btn primary-btn">Start Flight</button>
-  </div>
+  <main class="canvas-container">
 
-  <!-- 2. The Single Game Canvas -->
-  <canvas id="gameCanvas" width="400" height="600"></canvas>
+    <!-- 1. Start Screen (sits over the blurred, idle game) -->
+    <div id="start-screen" class="start-overlay">
+      <h2>Bee Flyer</h2>
+      <p>Tap the screen or press <strong>Spacebar</strong> to flap.<br />Thread the flowers. Don't touch the dirt.</p>
+      <button id="start-btn" class="btn primary-btn">Start Flight</button>
+    </div>
 
-  <!-- 3. Game Over Modal - This is where the user can download your Resume or Start over. -->
-  <div id="gameOverModal" class="overlay hidden">
-    <div class="modal-card">
-      <span class="badge-death">Ouch! You took a tumble 🐝</span>
-      <h2>Flight Ended!</h2>
-      <p class="score-summary">Final Score: <span id="finalScore">0</span></p>
-      <p class="resume-pitch">
-        The bee may have crashed, but your next project doesn't have to. Check out my resume to see how we can build great products together!
-      </p>
-      <div class="cta-group">
-        <a href="https://framerusercontent.com/assets/1LJu2AyCiR7ZIugwcFPzFXUevKU.pdf" target="_blank" rel="noopener noreferrer" id="resumeLink" class="resume-btn">
-        Download / View Resume
-        </a>
-        <button id="restartBtn" class="btn secondary-btn">Try Again 🐝</button>
+    <!-- 2. The Game Canvas -->
+    <canvas id="gameCanvas" width="400" height="600"></canvas>
+
+    <!-- 3. Game Over Modal: the recruiter payoff -->
+    <div id="gameOverModal" class="overlay hidden">
+      <div class="modal-card">
+        <span class="badge-death">Ouch! You took a tumble 🐝</span>
+        <h2>Flight Ended!</h2>
+        <p class="score-summary">Final Score: <span id="finalScore">0</span> &middot; Best: <span id="bestScore">0</span></p>
+        <p class="crash-quip" id="crashQuip"></p>
+        <p class="resume-pitch">
+          The bee may have crashed, but your next project doesn't have to. Check out my resume to see how we can build great products together!
+        </p>
+        <div class="cta-group">
+          <a href="#" target="_blank" rel="noopener noreferrer" id="resumeLink" class="btn primary-btn resume-btn">
+            Download Resume (PDF)
+          </a>
+          <button id="restartBtn" class="btn secondary-btn">Try Again 🐝</button>
+        </div>
       </div>
     </div>
-  </div>
-</main>
+  </main>
 
-  <script src="game.js"></script>
+</div>
+
+<script src="game.js"></script>
 </body>
 </html>

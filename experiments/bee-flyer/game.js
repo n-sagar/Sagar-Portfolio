@@ -1,339 +1,512 @@
-console.log("Bee Flyer Game Engine Loaded");
+// ==========================================
+// BEE FLYER - game engine
+// ==========================================
 
+// ----- CONFIG: tune the feel here -----
+const CONFIG = {
+  RESUME_URL: 'https://framerusercontent.com/assets/1LJu2AyCiR7ZIugwcFPzFXUevKU.pdf',
+  gravity: 0.3,      // lower = floatier, more time to react
+  lift: -6.6,        // flap strength: higher magnitude = snappier jump
+  maxFall: 8,        // terminal velocity so the bee never drops too fast
+  startSpeed: 2.4,   // scroll speed at score 0
+  speedStep: 0.2,    // speed added every `speedEvery` points
+  speedEvery: 5,
+  maxSpeed: 4.4,
+  spawnEvery: 95,    // frames between flower pairs
+  gap: 190,          // vertical opening between flowers
+  plantWidth: 28,    // collision width of the flower stems
+  groundHeight: 60
+};
+
+// ----- DOM references -----
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+const startScreen = document.getElementById('start-screen');
+const startButton = document.getElementById('start-btn');
+const canvasContainer = document.querySelector('.canvas-container');
+const gameOverModal = document.getElementById('gameOverModal');
+const restartBtn = document.getElementById('restartBtn');
+const scoreText = document.getElementById('scoreText');
+const finalScoreText = document.getElementById('finalScore');
+const crashQuipText = document.getElementById('crashQuip');
+const bestScoreText = document.getElementById('bestScore');
+const resumeLink = document.getElementById('resumeLink');
 
-const groundHeight = 60;
+const W = canvas.width;
+const H = canvas.height;
+const GROUND_Y = H - CONFIG.groundHeight;
+const PETAL_COLORS = ['#ff8fab', '#ffd166', '#c77dff', '#ff9f1c', '#8ecae6'];
 
-let isGameStarted = false; // New: Tracks if the player has made their first tap
+// ----- State -----
+let overlayVisible = true;   // start screen is showing
+let isGameStarted = false;   // bee has been tapped at least once
 let isGameOver = false;
 let score = 0;
-let frameCount = 0;
+let frameCount = 0;          // only counts while flying (drives spawning)
+let time = 0;                // always counts (idle bob + wing flap)
+let speed = CONFIG.startSpeed;
+let groundScroll = 0;
+let shake = 0;
+let crashTimer = null;
+let obstacles = [];
+let particles = [];
 
-// Obstacle configuration for garden plants
-const obstacles = [];
-const spawnRate = 90; // Spawns flowers quicker (lower number = closer together)
-const obstacleWidth = 40;
-const obstacleGap = 200; 
+let bestScore = 0;
+try {
+  bestScore = Number(localStorage.getItem('beeFlyerBest')) || 0;
+} catch (e) { /* storage blocked: fine, just no saved best */ }
 
-// Bee Object Setup - This is where we adjust the bees' movements
-const bee = {
-  x: 80,
-  y: canvas.height / 2,
-  radius: 18,
-  gravity: 0.35,  // Reduced from 0.55 so it falls much slower & smoother
-  lift: -7.5,     // Adjusted lift to match the lighter gravity perfectly
-  velocity: 0
-};
-// ==========================================
-// INPUT LISTENER: Start/Flap on Click or Spacebar
-// ==========================================
-function triggerFly(e) {
-  // Prevent default behavior if clicking buttons
-  if (isGameOver) return;
+const bee = { x: 90, y: H / 2, velocity: 0 };
 
-  if (!isGameStarted) {
-    isGameStarted = true; // Kick off physics and movement on first tap!
-  }
-  
-  bee.velocity = bee.lift;
-}
-
-// Bind to the canvas specifically so clicks inside the game area always register
-canvas.addEventListener('click', triggerFly);
-
-window.addEventListener('keydown', (e) => {
-  if (e.code === 'Space') {
-    e.preventDefault();
-    if (isGameOver) {
-      resetGame();
-    } else {
-      triggerFly();
-    }
-  }
+// Two parallax layers of clouds: far ones are slower and softer
+const clouds = Array.from({ length: 6 }, (_, i) => {
+  const far = i % 2 === 0;
+  return {
+    x: Math.random() * W,
+    y: 40 + Math.random() * 200,
+    r: far ? 14 + Math.random() * 8 : 20 + Math.random() * 12,
+    speed: far ? 0.25 : 0.6,
+    color: far ? '#eaf6ff' : '#ffffff'
+  };
 });
 
 // ==========================================
-// UPDATE FUNCTION: Physics & Plant Spawning
+// HELPERS
 // ==========================================
-function update() {
-  if (!isGameStarted || isGameOver) return; // Freeze physics until player taps!
-
-  // 1. Apply gravity and update bee position
-  bee.velocity += bee.gravity;
-  bee.y += bee.velocity;
-
-  // Flight Boundaries: Crash if hitting ground or flying off top screen
-  const floorLevel = canvas.height - groundHeight;
-  if (bee.y >= floorLevel || bee.y <= 0) {
-    triggerGameOver();
-  }
-
-  // 2. Spawning Logic: Create garden plants quicker
-  frameCount++;
-  if (frameCount % spawnRate === 0) {
-    const minHeight = 60;
-    const maxHeight = canvas.height - obstacleGap - 120;
-    const topHeight = Math.floor(Math.random() * (maxHeight - minHeight + 1)) + minHeight;
-
-    obstacles.push({
-      x: canvas.width,
-      top: topHeight,
-      bottom: canvas.height - (topHeight + obstacleGap),
-      passed: false
+function burst(x, y, color, count, power = 3, life = 30) {
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const v = Math.random() * power;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * v,
+      vy: Math.sin(angle) * v,
+      life, max: life,
+      color,
+      size: 2 + Math.random() * 3
     });
   }
+}
 
-  // 3. Movement, Scoring, and Collision Loop
+function updateScoreUI() {
+  scoreText.innerText = score;
+}
+
+function crashQuip(s) {
+  if (s === 0) return 'Gravity said hello before the first flower did. It happens to the best pollinators.';
+  if (s < 5) return 'Beginner’s luck ran out. The flowers were not impressed.';
+  if (s < 10) return 'Solid flying! Then the ground decided it wanted a hug.';
+  if (s < 20) return 'Serious nectar navigation. Shame about the landing.';
+  return 'Legend of the garden. The bee retires with honor and a sore wing.';
+}
+
+function saveBest() {
+  if (score > bestScore) {
+    bestScore = score;
+    try { localStorage.setItem('beeFlyerBest', bestScore); } catch (e) { /* ignore */ }
+  }
+}
+
+// ==========================================
+// INPUT
+// ==========================================
+function flap() {
+  if (isGameOver) return;
+  if (!isGameStarted) isGameStarted = true;
+  bee.velocity = CONFIG.lift;
+  burst(bee.x - 12, bee.y + 6, 'rgba(255,255,255,0.9)', 3, 1.2, 18);
+}
+
+function hideStartScreen() {
+  if (!overlayVisible) return;
+  overlayVisible = false;
+  startScreen.classList.add('fade-out');
+  canvasContainer.classList.add('game-active'); // removes the blur
+  setTimeout(() => startScreen.classList.add('hidden'), 400);
+}
+
+// Tap/click the canvas to flap (pointer events cover mouse + touch)
+canvas.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  flap();
+});
+
+startButton.addEventListener('click', hideStartScreen);
+
+window.addEventListener('keydown', (e) => {
+  if (e.code !== 'Space') return;
+  e.preventDefault();
+  if (e.repeat) return; // holding space should not spam flaps
+  if (overlayVisible) return hideStartScreen();
+  if (isGameOver) return resetGame();
+  flap();
+});
+
+restartBtn.addEventListener('click', resetGame);
+
+// ==========================================
+// UPDATE: physics, spawning, scoring
+// ==========================================
+function update() {
+  time++;
+
+  // Crash: the bee tumbles down to the ground
+  if (isGameOver) {
+    bee.velocity = Math.min(bee.velocity + CONFIG.gravity, CONFIG.maxFall);
+    bee.y += bee.velocity;
+    if (bee.y + 10 >= GROUND_Y) {
+      bee.y = GROUND_Y - 10;
+      bee.velocity = 0;
+    }
+    return;
+  }
+
+  // Before the first tap: the bee hovers and bobs gently
+  if (!isGameStarted) {
+    bee.y = H / 2 + Math.sin(time * 0.05) * 8;
+    return;
+  }
+
+  frameCount++;
+  speed = Math.min(
+    CONFIG.maxSpeed,
+    CONFIG.startSpeed + Math.floor(score / CONFIG.speedEvery) * CONFIG.speedStep
+  );
+  groundScroll = (groundScroll + speed) % 24;
+
+  // Physics
+  bee.velocity = Math.min(bee.velocity + CONFIG.gravity, CONFIG.maxFall);
+  bee.y += bee.velocity;
+
+  // Floor and ceiling are both deadly
+  if (bee.y - 14 <= 0 || bee.y + 10 >= GROUND_Y) {
+    triggerGameOver();
+    return;
+  }
+
+  // Spawn a new pair of flowers
+  if (frameCount % CONFIG.spawnEvery === 0) spawnPlant();
+
+  // Move flowers, check collisions, score
   for (let i = obstacles.length - 1; i >= 0; i--) {
     const obs = obstacles[i];
-    obs.x -= 2.5; // Smooth scrolling speed
+    obs.x -= speed;
 
-    // Check collision with plant stems
-    const beeLeft = bee.x - 14;
-    const beeRight = bee.x + 14;
-    const beeTop = bee.y - 12;
-    const beeBottom = bee.y + 10;
-
-    if (
-      beeRight > obs.x &&
-      beeLeft < obs.x + obstacleWidth &&
-      (beeTop < obs.top || beeBottom > canvas.height - obs.bottom)
-    ) {
+    if (hitsPlant(obs)) {
       triggerGameOver();
+      return;
     }
 
-    // Increase score if bee passes plant successfully
-    if (!obs.passed && obs.x + obstacleWidth < bee.x) {
-      score++;
-      document.getElementById('scoreText').innerText = score;
+    if (!obs.passed && obs.x + CONFIG.plantWidth < bee.x) {
       obs.passed = true;
+      score++;
+      updateScoreUI();
+      burst(bee.x, bee.y, '#ffd166', 8, 3, 25);
     }
 
-    // Clean up off-screen plants
-    if (obs.x + obstacleWidth < 0) {
-      obstacles.splice(i, 1);
+    if (obs.x + CONFIG.plantWidth + 30 < 0) obstacles.splice(i, 1);
+  }
+}
+
+function spawnPlant() {
+  const margin = 70;
+  const minTop = margin;
+  const maxTop = GROUND_Y - CONFIG.gap - margin;
+  obstacles.push({
+    x: W,
+    top: minTop + Math.random() * (maxTop - minTop), // top flower bottom edge
+    color: PETAL_COLORS[Math.floor(Math.random() * PETAL_COLORS.length)],
+    passed: false
+  });
+}
+
+function hitsPlant(obs) {
+  const bl = bee.x - 12;
+  const br = bee.x + 12;
+  const bt = bee.y - 12;
+  const bb = bee.y + 10;
+
+  const overlapX = br > obs.x && bl < obs.x + CONFIG.plantWidth;
+  if (!overlapX) return false;
+
+  // Gap runs from obs.top down to obs.top + gap
+  return bt < obs.top || bb > obs.top + CONFIG.gap;
+}
+
+function updateClouds() {
+  for (const c of clouds) {
+    c.x -= c.speed;
+    if (c.x + c.r * 2 < 0) {
+      c.x = W + c.r * 2;
+      c.y = 40 + Math.random() * 200;
     }
   }
 }
 
+function updateParticles() {
+  for (const p of particles) {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.08;
+    p.vx *= 0.98;
+    p.life--;
+  }
+  particles = particles.filter(p => p.life > 0);
+}
+
 // ==========================================
-// CUSTOM VECTOR BEE RENDERER
+// DRAW
 // ==========================================
-function drawBee(x, y) {
-  const wingOffset = (Math.floor(frameCount / 5) % 2 === 0) ? -6 : 2;
-  
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 2;
+function drawSky() {
+  const grad = ctx.createLinearGradient(0, 0, 0, GROUND_Y);
+  grad.addColorStop(0, '#7ccfff');
+  grad.addColorStop(1, '#d9f3ff');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+}
 
-  // 1. Wings
+function drawClouds() {
+  for (const c of clouds) {
+    ctx.fillStyle = c.color;
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
+    ctx.arc(c.x + c.r * 0.9, c.y + c.r * 0.2, c.r * 0.8, 0, Math.PI * 2);
+    ctx.arc(c.x - c.r * 0.9, c.y + c.r * 0.3, c.r * 0.7, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawGround() {
+  // Soil
+  ctx.fillStyle = '#6b4423';
+  ctx.fillRect(0, GROUND_Y, W, CONFIG.groundHeight);
+
+  // Grass strip
+  ctx.fillStyle = '#4caf50';
+  ctx.fillRect(0, GROUND_Y, W, 12);
+
+  // Grass tufts scroll with the game speed
+  ctx.fillStyle = '#388e3c';
+  for (let gx = -groundScroll; gx < W; gx += 24) {
+    ctx.beginPath();
+    ctx.moveTo(gx, GROUND_Y);
+    ctx.lineTo(gx + 5, GROUND_Y - 8);
+    ctx.lineTo(gx + 10, GROUND_Y);
+    ctx.fill();
+  }
+}
+
+function drawFlowerHead(cx, cy, color) {
+  for (let i = 0; i < 8; i++) {
+    const a = (i * Math.PI) / 4;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(cx + Math.cos(a) * 10, cy + Math.sin(a) * 10, 7, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.fillStyle = '#fff3b0';
   ctx.beginPath();
-  ctx.ellipse(x - 2, y - 22 + wingOffset, 7, 14, Math.PI / 6, 0, Math.PI * 2);
+  ctx.arc(cx, cy, 6, 0, Math.PI * 2);
   ctx.fill();
-  ctx.stroke();
+}
 
-  ctx.beginPath();
-  ctx.ellipse(x + 4, y - 26 + wingOffset, 8, 16, Math.PI / 8, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
+function drawPlant(obs) {
+  const cx = obs.x + CONFIG.plantWidth / 2;
+  const headTop = obs.top - 12;                 // top flower sits at the gap edge
+  const headBottom = obs.top + CONFIG.gap + 12; // bottom flower sits at the other edge
 
-  // 2. Main Body
-  ctx.beginPath();
-  ctx.ellipse(x, y - 10, 22, 15, Math.PI / 12, 0, Math.PI * 2);
-  ctx.fillStyle = '#FFFFFF'; 
-  ctx.fill();
-  ctx.lineWidth = 2.5;
-  ctx.strokeStyle = '#000000';
-  ctx.stroke();
-
-  // 3. Three Bold Black Stripes
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 4.5;
+  // Stems
+  ctx.strokeStyle = '#3d7a3a';
+  ctx.lineWidth = 6;
   ctx.lineCap = 'round';
-
   ctx.beginPath();
-  ctx.moveTo(x - 10, y - 19);
-  ctx.lineTo(x - 6, y + 3);
+  ctx.moveTo(cx, 0);
+  ctx.lineTo(cx, headTop);
+  ctx.moveTo(cx, GROUND_Y);
+  ctx.lineTo(cx, headBottom);
   ctx.stroke();
 
+  // Leaves
+  ctx.fillStyle = '#4caf50';
   ctx.beginPath();
-  ctx.moveTo(x - 2, y - 21);
-  ctx.lineTo(x + 2, y + 1);
+  ctx.ellipse(cx - 10, obs.top * 0.5, 9, 4, -0.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(cx + 10, GROUND_Y - 60, 9, 4, 0.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Flower heads
+  drawFlowerHead(cx, headTop, obs.color);
+  drawFlowerHead(cx, headBottom, obs.color);
+}
+
+function drawBee(x, y) {
+  const flapEvery = bee.velocity < 0 ? 3 : 6;   // flap faster while rising
+  const wingOffset = Math.floor(time / flapEvery) % 2 === 0 ? -6 : 2;
+  const tilt = Math.max(-0.45, Math.min(0.5, bee.velocity * 0.06)); // nose up when rising
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(tilt);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = '#000000';
+
+  // Wings
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.ellipse(-2, -22 + wingOffset, 7, 14, Math.PI / 6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.ellipse(4, -26 + wingOffset, 8, 16, Math.PI / 8, 0, Math.PI * 2);
+  ctx.fill();
   ctx.stroke();
 
+  // Body (yellow, like the sprite SVG) with stripes clipped inside it
   ctx.beginPath();
-  ctx.moveTo(x + 6, y - 23);
-  ctx.lineTo(x + 10, y - 1);
+  ctx.ellipse(0, -10, 22, 15, Math.PI / 12, 0, Math.PI * 2);
+  ctx.fillStyle = '#FFE816';
+  ctx.fill();
+  ctx.save();
+  ctx.clip();
+  ctx.lineWidth = 4.5;
+  ctx.beginPath();
+  ctx.moveTo(-10, -19); ctx.lineTo(-6, 3);
+  ctx.moveTo(-2, -21);  ctx.lineTo(2, 1);
+  ctx.moveTo(6, -23);   ctx.lineTo(10, -1);
   ctx.stroke();
-
+  ctx.restore();
   ctx.lineWidth = 2.5;
-
-  // 4. Head
   ctx.beginPath();
-  ctx.arc(x + 18, y - 12, 11, 0, Math.PI * 2);
+  ctx.ellipse(0, -10, 22, 15, Math.PI / 12, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Head
+  ctx.beginPath();
+  ctx.arc(18, -12, 11, 0, Math.PI * 2);
   ctx.fillStyle = '#FFFFFF';
   ctx.fill();
-  ctx.strokeStyle = '#000000';
   ctx.stroke();
 
-  // 5. Antennae
+  // Antennae
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(x + 14, y - 22);
-  ctx.quadraticCurveTo(x + 12, y - 28, x + 9, y - 27);
+  ctx.moveTo(14, -22);
+  ctx.quadraticCurveTo(12, -28, 9, -27);
+  ctx.moveTo(20, -22);
+  ctx.quadraticCurveTo(22, -29, 25, -28);
   ctx.stroke();
 
-  ctx.beginPath();
-  ctx.moveTo(x + 20, y - 22);
-  ctx.quadraticCurveTo(x + 22, y - 29, x + 25, y - 28);
-  ctx.stroke();
-
-  // 6. Eye & Smile
+  // Eye and smile
   ctx.fillStyle = '#000000';
   ctx.beginPath();
-  ctx.arc(x + 21, y - 16, 2, 0, Math.PI * 2);
+  ctx.arc(21, -16, 2, 0, Math.PI * 2);
   ctx.fill();
-
-  ctx.strokeStyle = '#000000';
   ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.arc(x + 22, y - 12, 4, 0.4 * Math.PI, 1.1 * Math.PI);
-  ctx.stroke();
-}
-
-// ==========================================
-// HELPER: Draw Vector Flower Blossom
-// ==========================================
-function drawFlowerHead(cx, cy, radius) {
-  ctx.save();
-  ctx.fillStyle = '#ffffff';
-  ctx.strokeStyle = '#718096';
-  ctx.lineWidth = 2;
-
-  const petals = 8;
-  ctx.beginPath();
-  for (let i = 0; i < petals; i++) {
-    const angle = (i * 2 * Math.PI) / petals;
-    const x = cx + Math.cos(angle) * radius;
-    const y = cy + Math.sin(angle) * radius;
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  }
-  ctx.closePath();
-  ctx.fill();
+  ctx.arc(22, -12, 4, 0.4 * Math.PI, 1.1 * Math.PI);
   ctx.stroke();
 
-  ctx.fillStyle = '#718096';
-  ctx.beginPath();
-  ctx.arc(cx, cy, 3, 0, Math.PI * 2);
-  ctx.fill();
   ctx.restore();
 }
 
-// ==========================================
-// DRAW FUNCTION: Bright Outdoor Garden
-// ==========================================
-function draw() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  
-  // 1. Bright Outdoor Sky Background (Lighter tone)
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+function drawParticles() {
+  for (const p of particles) {
+    ctx.globalAlpha = Math.max(0, p.life / p.max);
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
 
-  // 2. Ground Grass Baseline
-  const floorY = canvas.height - groundHeight;
+function drawScore() {
+  ctx.font = 'bold 20px Inter, sans-serif';
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = '#ffffff';
+  ctx.strokeText(`Score: ${score}`, 16, 36);
   ctx.fillStyle = '#1a202c';
-  ctx.fillRect(0, floorY, canvas.width, groundHeight);
+  ctx.fillText(`Score: ${score}`, 16, 36);
+}
 
-  ctx.strokeStyle = '#718096';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(0, floorY);
-  ctx.lineTo(canvas.width, floorY);
-  ctx.stroke();
+function draw() {
+  ctx.save();
 
-  // 3. Draw Garden Plant Stems & Blossoms
-  for (let i = 0; i < obstacles.length; i++) {
-    const obs = obstacles[i];
-    const stemX = obs.x + obstacleWidth / 2;
-
-    ctx.strokeStyle = '#cbd5e0';
-    ctx.lineWidth = 2;
-
-    // Bottom Plant Stem
-    ctx.beginPath();
-    ctx.moveTo(stemX, floorY);
-    ctx.lineTo(stemX, floorY - obs.bottom);
-    ctx.stroke();
-
-    drawFlowerHead(stemX, floorY - obs.bottom, 12);
-
-    // Top Plant Stem
-    ctx.beginPath();
-    ctx.moveTo(stemX, 0);
-    ctx.lineTo(stemX, obs.top);
-    ctx.stroke();
-
-    drawFlowerHead(stemX, obs.top, 12);
+  // Screen shake on crash
+  if (shake > 0.5) {
+    ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
+    shake *= 0.85;
+  } else {
+    shake = 0;
   }
 
-  // 4. Render Vector Bee
+  drawSky();
+  drawClouds();
+  for (const obs of obstacles) drawPlant(obs);
+  drawGround();
   drawBee(bee.x, bee.y);
+  drawParticles();
+  drawScore();
 
-  // 5. Score display
-  ctx.fillStyle = '#f0f2f5';
-  ctx.font = 'bold 20px sans-serif';
-  ctx.fillText(`Score: ${score}`, 20, 40);
+  ctx.restore();
 }
 
 // ==========================================
 // GAME LOOP
 // ==========================================
 function loop() {
+  updateClouds();
   update();
+  updateParticles();
   draw();
-
   requestAnimationFrame(loop);
 }
 
 // ==========================================
-// GAME OVER & RESET HELPERS
+// GAME OVER & RESET
 // ==========================================
 function triggerGameOver() {
+  if (isGameOver) return;
   isGameOver = true;
-  document.getElementById('finalScore').innerText = score;
-  document.getElementById('gameOverModal').classList.remove('hidden');
+  shake = 14;
+
+  burst(bee.x, bee.y, '#ff6b6b', 14, 5, 35);   // impact burst
+  burst(bee.x, bee.y, '#ffffff', 10, 4, 45);   // feathers
+
+  saveBest();
+  finalScoreText.innerText = score;
+  crashQuipText.innerText = crashQuip(score);
+  bestScoreText.innerText = bestScore;
+  resumeLink.href = CONFIG.RESUME_URL;
+
+  // Let the crash play out before the modal appears
+  crashTimer = setTimeout(() => gameOverModal.classList.remove('hidden'), 600);
 }
 
 function resetGame() {
-  isGameStarted = false; // Return to hover-at-start state
+  clearTimeout(crashTimer);
+  gameOverModal.classList.add('hidden');
+
+  isGameStarted = false;
   isGameOver = false;
   score = 0;
   frameCount = 0;
-  obstacles.length = 0;
-  bee.y = canvas.height / 2;
+  speed = CONFIG.startSpeed;
+  groundScroll = 0;
+  shake = 0;
+  obstacles = [];
+  particles = [];
+  bee.y = H / 2;
   bee.velocity = 0;
-  document.getElementById('scoreText').innerText = score;
-  document.getElementById('gameOverModal').classList.add('hidden');
-}
-// Hook up the Try Again restart button
-const restartBtn = document.getElementById('restartBtn');
-if (restartBtn) {
-  restartBtn.addEventListener('click', () => {
-    resetGame();
-  });
+  updateScoreUI();
 }
 
 // ==========================================
-// START GAME TRIGGER & CANVAS REVEAL
+// START
 // ==========================================
-const startButton = document.getElementById('start-btn');
-const startScreen = document.getElementById('start-screen');
-const canvasContainer = document.querySelector('.canvas-container');
-
-startButton.addEventListener('click', () => {
-  startScreen.style.display = 'none';
-  canvasContainer.classList.add('game-active');
-  loop(); // Starts the loop, but bee waits safely until first tap!
-});
+resumeLink.href = CONFIG.RESUME_URL;
+bestScoreText.innerText = bestScore;
+loop(); // runs from the start so the blurred preview is alive behind the overlay

@@ -26,17 +26,6 @@ body {
   padding: 1rem;
 }
 
-/* The canvas container starts with a frosted blur */
-.game-container canvas {
-  filter: blur(6px);
-  transition: filter 0.4s ease-in-out; /* Smooth transition when clicking start */
-}
-
-/* Once the game starts, this class removes the blur */
-.game-container.game-active canvas {
-  filter: blur(0px);
-}
-
 .game-wrapper {
   width: 100%;
   max-width: 420px;
@@ -67,65 +56,105 @@ body {
   color: var(--accent-yellow);
 }
 
-/* Container must be relative so absolute children align to it - This is for the Content on the start screen. */
+/* Container is relative so the start overlay and modal align to it */
 .canvas-container {
   position: relative;
   width: 400px;
   height: 600px;
   margin: 0 auto;
+  border-radius: 12px;
+  overflow: hidden;
 }
 
 #gameCanvas {
   width: 100%;
   height: 100%;
   display: block;
-  background: #182026; /* Dark sky background */
+  touch-action: none; /* stops mobile scrolling/zoom while tapping to flap */
+  user-select: none;
+  cursor: pointer;
 }
 
-/* Canvas starts with a subtle frosted blur */
+/* Before Start: the idle game is visible but softly blurred behind the overlay.
+   The blur lifts when the player starts. */
 .canvas-container canvas {
-  filter: blur(6px);
+  filter: blur(3px) brightness(0.9);
   transition: filter 0.4s ease-in-out;
 }
 
-/* When the game starts, the blur disappears */
 .canvas-container.game-active canvas {
-  filter: blur(0px);
+  filter: blur(0px) brightness(1);
 }
 
-/* The Start Screen Overlay styling  This allows for the canvas to be blurred until the user hits start */
+/* Start overlay: light enough that the blurred bee and flowers still show through */
 .start-overlay {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  inset: 0;
   display: flex;
   flex-direction: column;
-  justify-content: center; /* Centers vertically */
-  align-items: center;     /* Centers horizontally */
+  justify-content: center;
+  align-items: center;
   text-align: center;
-  background: rgba(15, 23, 42, 0.85); /* Sleek dark frosted glass look */
+  background: rgba(15, 23, 42, 0.45);
   color: #ffffff;
   z-index: 10;
-  border-radius: 12px;
   padding: 20px;
+  transition: opacity 0.4s ease;
 }
 
-/* Space out elements inside the overlay */
+.start-overlay.fade-out {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .start-overlay h2 {
-  font-size: 32px;
+  font-size: 36px;
   margin-bottom: 10px;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
 }
 
 .start-overlay p {
   font-size: 16px;
+  line-height: 1.5;
   margin-bottom: 24px;
-  color: #94A3B8;
+  color: #e2e8f0;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.5);
 }
 
 .hidden {
   display: none !important;
+}
+
+/* Game over modal */
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 16px;
+  background: rgba(15, 17, 21, 0.7);
+  backdrop-filter: blur(4px);
+  z-index: 20;
+}
+
+.modal-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 28px;
+  width: 100%;
+  max-width: 340px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  animation: pop-in 0.35s ease-out;
+}
+
+@keyframes pop-in {
+  from { transform: scale(0.92); opacity: 0; }
+  to   { transform: scale(1);    opacity: 1; }
 }
 
 .badge-death {
@@ -134,26 +163,28 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   font-weight: 600;
-  margin-bottom: 0.5rem;
-  display: block;
 }
 
 .modal-card h2 {
   font-size: 1.75rem;
-  margin-bottom: 0.5rem;
 }
 
 .score-summary {
-  font-size: 1.1rem;
+  font-size: 1rem;
   color: var(--text-muted);
-  margin-bottom: 1rem;
+}
+
+.crash-quip {
+  font-size: 1rem;
+  color: #ffd166;
+  font-weight: 600;
+  line-height: 1.4;
 }
 
 .resume-pitch {
   font-size: 0.9rem;
   color: var(--text-muted);
   line-height: 1.5;
-  margin-bottom: 1.5rem;
 }
 
 /* Buttons */
@@ -162,26 +193,30 @@ body {
   flex-direction: column;
   gap: 0.75rem;
   width: 100%;
+  margin-top: 0.5rem;
 }
 
 .btn {
+  display: inline-block;
+  text-align: center;
+  text-decoration: none;
   padding: 0.8rem 1.25rem;
   border-radius: 8rem;
   font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
-  text-decoration: none;
   transition: all 0.2s ease;
   border: none;
 }
 
-.primary-btn, .primary {
+.primary-btn {
   background-color: var(--accent-yellow);
-  color: #000;
+  color: #000000;
 }
 
-.primary-btn:hover, .primary:hover {
+.primary-btn:hover {
   background-color: var(--accent-yellow-hover);
+  color: #ffffff;
 }
 
 .secondary-btn {
@@ -192,4 +227,13 @@ body {
 
 .secondary-btn:hover {
   background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Phones: scale the game to the screen width, keep the 2:3 ratio */
+@media (max-width: 460px) {
+  .canvas-container {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 2 / 3;
+  }
 }
